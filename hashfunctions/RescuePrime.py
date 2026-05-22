@@ -145,3 +145,22 @@ class RescuePrime:
             
         return output_sequence
 
+if __name__ == "__main__":
+    PRIME = 4294967291  # 2^32 - 5
+    WIDTH = 3
+    CAPACITY = 1
+    SECURITY = 80
+    
+    rp_hasher = RescuePrime(p=PRIME, m=WIDTH, capacity=CAPACITY, security_level=SECURITY)
+    
+    print(f"Instantiated Rescue-Prime successfully!")
+    print(f"Calculated S-Box Alpha: {rp_hasher.alpha}")
+    print(f"Calculated Total Rounds (N): {rp_hasher.N}")
+    print(f"Rate (elements absorbed per round): {rp_hasher.rate}")
+    
+    my_data = [12345, 789012, 345678, 901234]
+    
+    # Calculate hash output
+    hash_output = rp_hasher.hash(my_data)
+    print(f"\nInput Data: {my_data}")
+    print(f"Rescue-Prime Hash Output Elements: {hash_output}")
