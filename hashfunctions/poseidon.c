@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <gmp.h>
+#include "poseidon.h"
 
 /* ============================================================
  * Parameters
