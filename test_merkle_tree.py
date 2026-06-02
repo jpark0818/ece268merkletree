@@ -11,6 +11,7 @@ from merkle_tree import (
     make_numpy_batch_fn
 )
 from hashfunctions.RescuePrime import RescuePrime
+from hashfunctions import poseidon
 
 
 def cupy_mod_pow_inplace(b, exp, mod):
@@ -151,6 +152,71 @@ def benchmark_hash_function(name: str, hash_fn, batch_fn, leaf_counts: list, is_
         print(f"{n:<10} | {format_time(cpu_build_time):<20} | {format_time(batch_build_time):<17} | {format_time(proof_gen_time):<12}")
 
 
+def make_fast_pure_cupy_poseidon_fn():
+    """
+    Returns a highly optimized, loop-unrolled CuPy batch hash function for Poseidon.
+    Assumes Poseidon has been scaled to the 31-bit Mersenne Prime.
+    """
+    from hashfunctions import poseidon # Import Dibyesh's module
+    import numpy as np
+    
+    # Check Dibyesh's initialization flag
+    if not poseidon._ready:
+        poseidon.poseidon_init()
+        
+    p_gpu = cp.uint64(poseidon.PRIME)
+    R_F = poseidon.R_F
+    R_P = poseidon.R_P
+    
+    # Extract matrices using Dibyesh's exact variable names
+    RC = cp.array(poseidon._RC, dtype=cp.uint64)
+    MDS = cp.array(poseidon._MDS, dtype=cp.uint64) 
+    
+    m00, m01, m02 = MDS[0][0], MDS[0][1], MDS[0][2]
+    m10, m11, m12 = MDS[1][0], MDS[1][1], MDS[1][2]
+    m20, m21, m22 = MDS[2][0], MDS[2][1], MDS[2][2]
+
+    def batch_hash(lefts_gpu, rights_gpu):
+        # Structure of Arrays
+        s0 = cp.zeros_like(lefts_gpu)  # Capacity element (state[0])
+        s1 = lefts_gpu.copy()          # Rate element 1 (state[1])
+        s2 = rights_gpu.copy()         # Rate element 2 (state[2])
+        
+        for r in range(R_F + R_P):
+            # 1. Add Round Constants (RC is a 2D array [N_ROUNDS][T])
+            s0 = (s0 + RC[r][0]) % p_gpu
+            s1 = (s1 + RC[r][1]) % p_gpu
+            s2 = (s2 + RC[r][2]) % p_gpu
+            
+            # 2. S-Boxes (x^5)
+            # Full rounds happen at the start and end; Partial rounds in the middle
+            is_full = (r < R_F // 2) or (r >= R_F // 2 + R_P)
+            
+            # Partial round only applies S-box to the capacity element (s0)
+            # x^5 = x^2 * x^2 * x
+            s0_2 = (s0 * s0) % p_gpu
+            s0_4 = (s0_2 * s0_2) % p_gpu
+            s0 = (s0_4 * s0) % p_gpu
+            
+            if is_full:
+                s1_2 = (s1 * s1) % p_gpu
+                s1_4 = (s1_2 * s1_2) % p_gpu
+                s1 = (s1_4 * s1) % p_gpu
+                
+                s2_2 = (s2 * s2) % p_gpu
+                s2_4 = (s2_2 * s2_2) % p_gpu
+                s2 = (s2_4 * s2) % p_gpu
+                
+            # 3. MDS Matrix Multiplication (UNROLLED)
+            ns0 = (m00*s0 % p_gpu + m01*s1 % p_gpu + m02*s2 % p_gpu) % p_gpu
+            ns1 = (m10*s0 % p_gpu + m11*s1 % p_gpu + m12*s2 % p_gpu) % p_gpu
+            ns2 = (m20*s0 % p_gpu + m21*s1 % p_gpu + m22*s2 % p_gpu) % p_gpu
+            s0, s1, s2 = ns0, ns1, ns2
+            
+        return s1 # Squeeze the rate element
+
+    return batch_hash
+    
 def run_all_benchmarks():
     # Tree sizes up to 8192
     sizes = [16, 256, 2048, 8192, 16384] 
@@ -169,9 +235,15 @@ def run_all_benchmarks():
     
     print("Initialization Complete. Starting Benchmarks...\n")
 
-    benchmark_hash_function("Poseidon (BN254) - CPU Baseline", poseidon_fn, poseidon_batch, sizes, is_gpu=False)
+    benchmark_hash_function("Poseidon (BN31) - CPU Baseline", poseidon_fn, poseidon_batch, sizes, is_gpu=False)
     benchmark_hash_function("Rescue Prime (32-bit) - CPU Baseline", rescue_fn, rescue_batch, sizes, is_gpu=False)
     benchmark_hash_function("Rescue Prime - OPTIMIZED CUPY ACCELERATION", rescue_fn, rescue_gpu_batch, sizes, is_gpu=True)
+    
+    print("Initializing Optimized Pure CuPy Kernel for Poseidon...")
+    poseidon_gpu_batch = make_fast_pure_cupy_poseidon_fn()
+    _ = poseidon_gpu_batch(cp.array([1, 2], dtype=cp.uint64), cp.array([3, 4], dtype=cp.uint64)) # Warmup
+    
+    benchmark_hash_function("Poseidon - OPTIMIZED CUPY ACCELERATION", poseidon_fn, poseidon_gpu_batch, sizes, is_gpu=True)
 
 if __name__ == "__main__":
     random.seed(42)

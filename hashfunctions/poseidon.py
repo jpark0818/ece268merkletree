@@ -1,5 +1,5 @@
 """
-poseidon.py — Poseidon hash function over the BN254 scalar field
+poseidon.py — Poseidon hash function over the BN31 scalar field
 
 Parameters : t = 3  (2-to-1 hash)
              R_F = 8  full rounds  (4 at start, 4 at end)
@@ -18,9 +18,9 @@ R_F      = 8
 R_P      = 57
 N_ROUNDS = R_F + R_P   # 65
 ALPHA    = 5
-N_BITS   = 254
+N_BITS   = 31
 
-PRIME = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+PRIME = 2147483647
 
 # ============================================================
 # Grain LFSR — deterministic round-constant generation
