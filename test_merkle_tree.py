@@ -3,7 +3,6 @@ import random
 import numpy as np
 import cupy as cp
 
-# Import CPU modules from your merkle_tree.py
 from merkle_tree import (
     MerkleTree, 
     BatchMerkleTree, 
@@ -13,9 +12,6 @@ from merkle_tree import (
 )
 from hashfunctions.RescuePrime import RescuePrime
 
-# =====================================================================
-# 1. OPTIMIZED PURE CUPY GPU FUNCTIONS (No C++ / No Raw CUDA)
-# =====================================================================
 
 def cupy_mod_pow_inplace(b, exp, mod):
     """
@@ -99,9 +95,6 @@ def make_fast_pure_cupy_rescue_fn(
 
     return batch_hash
 
-# =====================================================================
-# 2. Benchmarking Logic
-# =====================================================================
 
 def format_time(seconds: float) -> str:
     """Formats time into a readable string (ms or s)."""
@@ -157,13 +150,10 @@ def benchmark_hash_function(name: str, hash_fn, batch_fn, leaf_counts: list, is_
 
         print(f"{n:<10} | {format_time(cpu_build_time):<20} | {format_time(batch_build_time):<17} | {format_time(proof_gen_time):<12}")
 
-# =====================================================================
-# 3. Main Execution
-# =====================================================================
 
 def run_all_benchmarks():
     # Tree sizes up to 8192
-    sizes = [16, 256, 2048, 8192] 
+    sizes = [16, 256, 2048, 8192, 16384] 
     
     print("Initializing CPU Hash Functions...")
     poseidon_fn = make_poseidon_fn()
