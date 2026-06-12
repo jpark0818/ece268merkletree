@@ -278,7 +278,7 @@ def test_noncommutative():
 
 if __name__ == "__main__":
     print("============================================================")
-    print(f" Poseidon hash  BN254  t={T}  R_F={R_F}  R_P={R_P}  alpha={ALPHA}")
+    print(f" Poseidon hash t={T}  R_F={R_F}  R_P={R_P}  alpha={ALPHA}")
     print("============================================================")
     print(f"Generating {N_ROUNDS * T} round constants via Grain LFSR …")
     poseidon_init()
